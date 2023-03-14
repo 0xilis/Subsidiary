@@ -17,7 +17,6 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
  //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
- int addingEnvVar = 0; //int/bool that is 1 if we're adding DYLD_INSERT_LIBRARIES=, and 0 if we're modifying it
  int dyldLibIndex = -1;
  char **ptr;
  int index = 0;
@@ -28,8 +27,6 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   index++;
  }
  if (dyldLibIndex == -1) {
-  addingEnvVar = 1;
-  dyldLibIndex = index;
   index++;
  }
  const char* newEnvp[index];
@@ -39,7 +36,7 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   newEnvp[index2] = *ptr;
   index2++;
  }
- if (addingEnvVar) {
+ if (dyldLibIndex == -1) {
   //add DYLD_INSERT_LIBRARIES env var 
   //index2 should be equal to dyldLibIndex at this moment
   newEnvp[index2] = "DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib";
@@ -47,10 +44,10 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
   //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
   NSString *string = [[NSString alloc]initWithUTF8String:newEnvp[dyldLibIndex]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:%@",[str substringFromIndex:22]];
+  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:%@",[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
- return orig_posix_spawn(pid, orig_path, file_actions, attrp, orig_argv, newEnvp);
+ return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
 }
 int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char * const envp[restrict]) {
   //GUESS: Add DYLD_INSERT_LIBRARIES to envp
@@ -59,7 +56,6 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
  //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
- int addingEnvVar = 0; //int/bool that is 1 if we're adding DYLD_INSERT_LIBRARIES=, and 0 if we're modifying it
  int dyldLibIndex = -1;
  char **ptr;
  int index = 0;
@@ -70,8 +66,6 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   index++;
  }
  if (dyldLibIndex == -1) {
-  addingEnvVar = 1;
-  dyldLibIndex = index;
   index++;
  }
  const char* newEnvp[index];
@@ -81,7 +75,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   newEnvp[index2] = *ptr;
   index2++;
  }
- if (addingEnvVar) {
+ if (dyldLibIndex == -1) {
   //add DYLD_INSERT_LIBRARIES env var 
   //index2 should be equal to dyldLibIndex at this moment
   newEnvp[index2] = "DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib";
@@ -89,7 +83,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
   //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
   NSString *string = [[NSString alloc]initWithUTF8String:newEnvp[dyldLibIndex]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:%@",[str substringFromIndex:22]];
+  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:%@",[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
  return orig_posix_spawnp(pid, orig_path, file_actions, attrp, orig_argv, newEnvp);
