@@ -22,10 +22,8 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  char **ptr;
  int index = 0;
  for (ptr = envp; *ptr != NULL; ptr++) {
-  if (strlen(*ptr) > 21) { //check if string size if 22 or above, aka length of DYLD_INSERT_LIBRARIES= string
-   if(strncmp(*ptr, "DYLD_INSERT_LIBRARIES=", 22) == 0) { //check if string in envp starts with DYLD_INSERT_LIBRARIES=
-    dyldLibIndex = index;
-   }
+  if(strncmp(*ptr, "DYLD_INSERT_LIBRARIES=", 22) == 0) { //check if string in envp starts with DYLD_INSERT_LIBRARIES=
+   dyldLibIndex = index;
   }
   index++;
  }
@@ -66,10 +64,8 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  char **ptr;
  int index = 0;
  for (ptr = envp; *ptr != NULL; ptr++) {
-  if (strlen(*ptr) > 21) { //check if string size if 22 or above, aka length of DYLD_INSERT_LIBRARIES= string
-   if(strncmp(*ptr, "DYLD_INSERT_LIBRARIES=", 22) == 0) { //check if string in envp starts with DYLD_INSERT_LIBRARIES=
-    dyldLibIndex = index;
-   }
+  if(strncmp(*ptr, "DYLD_INSERT_LIBRARIES=", 22) == 0) { //check if string in envp starts with DYLD_INSERT_LIBRARIES=
+   dyldLibIndex = index;
   }
   index++;
  }
