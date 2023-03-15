@@ -45,9 +45,8 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
  //compile this dylib and put it in launchd, then CT sign
- //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
+ //adds a dylib to process if specified in filter
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
- //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
  
  //check if safe mode is on, if so don't inject
  FILE * fp;
@@ -103,9 +102,8 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
  //compile this dylib and put it in launchd, then CT sign
- //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
+ //adds a dylib to process if specified in filter
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
- //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
  
  //check if safe mode is on, if so don't inject
  FILE * fp;
