@@ -99,7 +99,9 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   *ugh++ = (char *)[[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
  }
  *ugh++ = NULL;
- return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
+ int ret_posix_spawn = orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp)
+ free(ugh);
+ return ret_posix_spawn;
 }
 int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char * const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
@@ -158,7 +160,9 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   *ugh++ = (char *)[[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
  }
  *ugh++ = NULL;
- return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
+ int ret_posix_spawnp = orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
+ free(ugh);
+ return ret_posix_spawnp;
 }
 
 int main(void) {
