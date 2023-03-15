@@ -10,6 +10,21 @@
 static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 
+NSString *findBundleID(const char *path) {
+ NSString *bundleID = [NSString stringWithUTF8String:path];
+ NSRange range = [bundleID rangeOfString:@".app/"];
+ if (range.length > 0) {
+  //process is an app
+  NSString *infoPlistPath = [NSString stringWithFormat:@"%@Info.plist",[bundleID substringToIndex:range.location]] //get the app's infoplist path from file path
+  NSDictionary *mainDictionary = [NSDictionary dictionaryWithContentsOfFile:infoPlistPath];
+  if (mainDictionary) {
+   return [mainDictionary objectForKey:@"CFBundleIdentifier"];
+  }
+ } else {
+  return NULL;
+ }
+}
+
 int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
