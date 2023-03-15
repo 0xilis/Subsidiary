@@ -10,9 +10,9 @@
 static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 
-#define SUBSIDIARY_TWEAK_PATH /var/subsidiary/tweaks
+#define SUBSIDIARY_TWEAK_LOAD_PLIST /var/subsidiary/tweaks/subsidiary.plist
 
-NSArray<NSString *>* whitelist;
+NSDictionary* filter;
 
 NSString *findBundleID(const char *path) {
  NSString *pathString = [NSString stringWithUTF8String:path];
@@ -54,10 +54,11 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   //get the process name if we can't get bundle id
   process = findProcessName(path);
  }
- if (![whitelist containsObject:process]) {
+ if (![[filter allKeys] containsObject:process]) {
   //not in whitelist - don't inject dylib, just call posix_spawn as normal
   return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
  }
+ NSString* injectionString = [filter objectForKey:process];
  int dyldLibIndex = -1;
  char **ptr;
  int index = 0;
@@ -80,12 +81,12 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  if (dyldLibIndex == -1) {
   //add DYLD_INSERT_LIBRARIES env var 
   //index2 should be equal to dyldLibIndex at this moment
-  newEnvp[index2] = "DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib";
+  newEnvp[index2] = [[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
  } else {
   //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
   //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
   NSString *string = [[NSString alloc]initWithUTF8String:newEnvp[dyldLibIndex]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:%@",[string substringFromIndex:22]];
+  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
  return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
@@ -124,14 +125,14 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
   //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
   NSString *string = [[NSString alloc]initWithUTF8String:newEnvp[dyldLibIndex]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:%@",[string substringFromIndex:22]];
+  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
  return orig_posix_spawnp(pid, orig_path, file_actions, attrp, orig_argv, newEnvp);
 }
 
 int main(void) {
- whitelist = [[NSArray alloc] initWithObjects:@"com.apple.springboard",@"installd",nil]; //whitelist of apps/processes to inject /var/subsidiary/TweakDylib.dylib into (SpringBoard and installd)
+ filter = [[NSDictionary alloc] initWithObjects:@"com.apple.springboard",@"/var/subsidiary/TweakDylib.dylib",@"installd",@"/var/subsidiary/TweakDylib.dylib",nil]; //dictionary of apps/processes to inject a dylib into (SpringBoard and installd inject /var/subsidiary/TweakDylib.dylib)
  uint32_t dyld_image_count = _dyld_image_count();
  //find our image
  for (int i=0; i<dyld_image_count; i++) {
