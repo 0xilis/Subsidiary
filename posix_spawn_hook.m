@@ -67,9 +67,8 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  }
  NSString* injectionString = [filter objectForKey:process];
  int dyldLibIndex = -1;
- char **ptr;
  int index = 0;
- for (ptr = envp; *ptr != NULL; ptr++) {
+ for (char * const *ptr = envp; *ptr; ptr++) {
   if(strncmp(*ptr, "DYLD_INSERT_LIBRARIES=", 22) == 0) { //check if string in envp starts with DYLD_INSERT_LIBRARIES=
    dyldLibIndex = index;
   }
@@ -81,7 +80,7 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  const char* newEnvp[index];
  //add env vars to newEnvp from our current environment vars
  int index2 = 0;
- for (ptr = envp; *ptr != NULL; ptr++) {
+ for (char * const *ptr = envp; *ptr; ptr++) {
   newEnvp[index2] = *ptr;
   index2++;
  }
@@ -125,9 +124,8 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  }
  NSString* injectionString = [filter objectForKey:process];
  int dyldLibIndex = -1;
- char **ptr;
  int index = 0;
- for (ptr = envp; *ptr != NULL; ptr++) {
+ for (char * const *ptr = envp; *ptr; ptr++) {
   if(strncmp(*ptr, "DYLD_INSERT_LIBRARIES=", 22) == 0) { //check if string in envp starts with DYLD_INSERT_LIBRARIES=
    dyldLibIndex = index;
   }
@@ -139,7 +137,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  const char* newEnvp[index];
  //add env vars to newEnvp from our current environment vars
  int index2 = 0;
- for (ptr = envp; *ptr != NULL; ptr++) {
+ for (char * const *ptr = envp; *ptr; ptr++) {
   newEnvp[index2] = *ptr;
   index2++;
  }
