@@ -159,7 +159,6 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
 int main(void) {
  NSMutableDictionary *mutableFilter = [[NSMutableDictionary alloc]init];
  NSArray* dirs = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:@"SUBSIDIARY_TWEAKINJECT_DIR" error:nil];
- NSMutableArray *plistFiles = [[NSMutableArray alloc] init];
  [dirs enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
   NSString *filename = (NSString *)obj;
   NSString *extension = [[filename pathExtension] lowercaseString];
