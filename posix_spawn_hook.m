@@ -37,7 +37,7 @@ NSString *findProcessName(const char *path) {
   //process is an app
   return [bundleID substringFromIndex:range.location];
  } else {
-  return NULL;
+  return path; //sometimes ex with posix_spawnp the file passed in will be the name of the process, so return the input passed
  }
 }
 
