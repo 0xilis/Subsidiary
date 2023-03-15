@@ -166,6 +166,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
 }
 
 int main(void) {
+ //TODO: This is a horrible method of seeing what to inject a dylib into. Improve the making of the filter dictionary latr
  NSMutableDictionary *mutableFilter = [[NSMutableDictionary alloc]init];
  NSArray* dirs = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:@"SUBSIDIARY_TWEAKINJECT_DIR" error:nil];
  [dirs enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
