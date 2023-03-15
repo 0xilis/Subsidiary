@@ -99,7 +99,7 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   *ugh++ = (char *)[injectionString UTF8String];
  }
  *ugh++ = NULL;
- int ret_posix_spawn = orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp)
+ int ret_posix_spawn = orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
  free(ugh);
  return ret_posix_spawn;
 }
