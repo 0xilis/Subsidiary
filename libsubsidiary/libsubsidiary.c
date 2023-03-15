@@ -15,10 +15,12 @@ void SubsidiaryGenericHookMethod(Class cls, SEL name, IMP imp, IMP *orig) {
   if (method_getName(m) == name) {
    //the method is in this class so we can safely replace the method
    *orig = class_replaceMethod(cls, name, imp, method_getTypeEncoding(hookMethod));
+   free(methods);
    return;
   }
  }
  //the method is in the superclass, add the method instead to not override superclass and get IMP of orig
+ free(methods);
  *orig = method_getImplementation(hookMethod);
  class_addMethod(cls, name, imp, method_getTypeEncoding(hookMethod));
 }
