@@ -8,7 +8,10 @@
 #import <Foundation/Foundation.h>
 
 static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
-static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
+static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
+
+#define SUBSIDIARY_TWEAKINJECT_DIR = /usr/lib/TweakInject
+#define SUBSIDIARY_SAFEMODE_FILE = /var/subsidiary/safemode
 
 NSDictionary* filter;
 
@@ -45,6 +48,13 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
  //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
+ 
+ //check if safe mode is on, if so don't inject
+ FILE * fp;
+ if ((fp = fopen("SUBSIDIARY_SAFEMODE_FILE", "r"))) {
+  fclose(fp);
+  return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
+ }
  
  //get bundle id for process and check if its in whitelist
  NSString *process = findBundleID(path);
@@ -90,12 +100,31 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
 }
 int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char * const envp[restrict]) {
-  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
+ //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
  //compile this dylib and put it in launchd, then CT sign
  //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
  //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
+ 
+ //check if safe mode is on, if so don't inject
+ FILE * fp;
+ if ((fp = fopen("SUBSIDIARY_SAFEMODE_FILE", "r"))) {
+  fclose(fp);
+  return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, envp);
+ }
+ 
+ //get bundle id for process and check if its in whitelist
+ NSString *process = findBundleID(file);
+ if (!process) {
+  //get the process name if we can't get bundle id
+  process = findProcessName(file);
+ }
+ if (![[filter allKeys] containsObject:process]) {
+  //not in whitelist - don't inject dylib, just call posix_spawn as normal
+  return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, envp);
+ }
+ NSString* injectionString = [filter objectForKey:process];
  int dyldLibIndex = -1;
  char **ptr;
  int index = 0;
@@ -118,7 +147,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  if (dyldLibIndex == -1) {
   //add DYLD_INSERT_LIBRARIES env var 
   //index2 should be equal to dyldLibIndex at this moment
-  newEnvp[index2] = "DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib";
+  newEnvp[index2] = [[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
  } else {
   //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
   //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
@@ -126,31 +155,31 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
- return orig_posix_spawnp(pid, orig_path, file_actions, attrp, orig_argv, newEnvp);
+ return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
 }
 
 int main(void) {
  NSMutableDictionary *mutableFilter = [[NSMutableDictionary alloc]init];
- NSArray* dirs = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:@"/usr/lib/TweakInject" error:nil];
+ NSArray* dirs = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:@"SUBSIDIARY_TWEAKINJECT_DIR" error:nil];
  NSMutableArray *plistFiles = [[NSMutableArray alloc] init];
  [dirs enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
   NSString *filename = (NSString *)obj;
   NSString *extension = [[filename pathExtension] lowercaseString];
   if ([extension isEqualToString:@"plist"]) {
-   NSArray *bundleIDs = [[[NSDictionary dictionaryWithContentsOfFile:[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Bundles"];
+   NSArray *bundleIDs = [[[NSDictionary dictionaryWithContentsOfFile:[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Bundles"];
    for (id bundleid in bundleIDs) {
     if ([mutableFilter objectForKey:bundleid]) {
-     [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:bundleid],[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:bundleid];
+     [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:bundleid],[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:bundleid];
     } else {
-     [mutableFilter addObject:[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:bundleid];
+     [mutableFilter addObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:bundleid];
     }
    }
-   NSArray *executables = [[[NSDictionary dictionaryWithContentsOfFile:[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Executables"];
+   NSArray *executables = [[[NSDictionary dictionaryWithContentsOfFile:[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Executables"];
    for (id executable in executables) {
     if ([mutableFilter objectForKey:executable]) {
-     [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:executable],[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:executable];
+     [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:executable],[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:executable];
     } else {
-     [mutableFilter addObject:[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:executable];
+     [mutableFilter addObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:executable];
     }
    }
   }
