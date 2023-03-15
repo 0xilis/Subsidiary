@@ -10,9 +10,13 @@
 static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 
+#define SUBSIDIARY_TWEAK_PATH /var/subsidiary/tweaks
+
+NSArray<NSString *>* whitelist;
+
 NSString *findBundleID(const char *path) {
- NSString *bundleID = [NSString stringWithUTF8String:path];
- NSRange range = [bundleID rangeOfString:@".app/"];
+ NSString *pathString = [NSString stringWithUTF8String:path];
+ NSRange range = [pathString rangeOfString:@".app/" options:NSBackwardsSearch];
  if (range.length > 0) {
   //process is an app
   NSString *infoPlistPath = [NSString stringWithFormat:@"%@Info.plist",[bundleID substringToIndex:range.location]] //get the app's infoplist path from file path
@@ -25,6 +29,17 @@ NSString *findBundleID(const char *path) {
  }
 }
 
+NSString *findProcessName(const char *path) {
+ NSString *pathString = [NSString stringWithUTF8String:path];
+ NSRange range = [pathString rangeOfString:@"/" options:NSBackwardsSearch];
+ if (range.length > 0) {
+  //process is an app
+  return [bundleID substringFromIndex:range.location];
+ } else {
+  return NULL;
+ }
+}
+
 int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
@@ -32,6 +47,17 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  //adds a dylib to every process (that being, "/var/subsidiary/TweakDylib.dylib")
  //dylib is sandboxed btw, but should be possible for unsandboxed dylibs as well theoretically, see opainject and the nullconga pdf, not in this example code tho bc idc for now
  //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
+ 
+ //get bundle id for process and check if its in whitelist
+ NSString *bundleID = findBundleID(path);
+ if (!bundleID) {
+  //get the process name if we can't get bundle id
+  findProcessName(path);
+ }
+ if (![whitelist containsObject:bundleID]) {
+  //not in whitelist - don't inject dylib, just call posix_spawn as normal
+  return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
+ }
  int dyldLibIndex = -1;
  char **ptr;
  int index = 0;
@@ -105,6 +131,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
 }
 
 int main(void) {
+ whitelist = [[NSArray alloc] initWithObjects:@"com.apple.springboard",@"installd",nil]; //whitelist of apps/processes to inject /var/subsidiary/TweakDylib.dylib into (SpringBoard and installd)
  uint32_t dyld_image_count = _dyld_image_count();
  //find our image
  for (int i=0; i<dyld_image_count; i++) {
