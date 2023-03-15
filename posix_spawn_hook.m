@@ -88,7 +88,7 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   char *env = envp[idx];
   if (index2 == dyldLibIndex) {
    NSString *string = [[NSString alloc]initWithUTF8String:envp[idx]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
+   string = [NSString stringWithFormat:@"%@:%@",injectionString,[string substringFromIndex:22]];
    env = (char *)[string UTF8String];
   }
   *ugh++ = env;
@@ -96,7 +96,7 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  }
  if (dyldLibIndex == -1) {
   //add DYLD_INSERT_LIBRARIES env var
-  *ugh++ = (char *)[[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
+  *ugh++ = (char *)[injectionString UTF8String];
  }
  *ugh++ = NULL;
  int ret_posix_spawn = orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp)
@@ -149,7 +149,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   char *env = envp[idx];
   if (index2 == dyldLibIndex) {
    NSString *string = [[NSString alloc]initWithUTF8String:envp[idx]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
+   string = [NSString stringWithFormat:@"%@:%@",injectionString,[string substringFromIndex:22]];
    env = (char *)[string UTF8String];
   }
   *ugh++ = env;
@@ -157,7 +157,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
  }
  if (dyldLibIndex == -1) {
   //add DYLD_INSERT_LIBRARIES env var
-  *ugh++ = (char *)[[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
+  *ugh++ = (char *)[injectionString UTF8String];
  }
  *ugh++ = NULL;
  int ret_posix_spawnp = orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
@@ -178,7 +178,7 @@ int main(void) {
     if ([mutableFilter objectForKey:bundleid]) {
      [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:bundleid],[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:bundleid];
     } else {
-     [mutableFilter setObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:bundleid];
+     [mutableFilter setObject:[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:bundleid];
     }
    }
    NSArray *executables = [[[NSDictionary dictionaryWithContentsOfFile:[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Executables"];
@@ -186,7 +186,7 @@ int main(void) {
     if ([mutableFilter objectForKey:executable]) {
      [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:executable],[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:executable];
     } else {
-     [mutableFilter setObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:executable];
+     [mutableFilter setObject:[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:executable];
     }
    }
   }
