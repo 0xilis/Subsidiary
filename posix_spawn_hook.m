@@ -8,8 +8,8 @@
 #include "fishhook.h"
 #import <Foundation/Foundation.h>
 
-static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
-static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
+static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char *const envp[restrict]);
+static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char *const envp[restrict]);
 
 #define SUBSIDIARY_TWEAKINJECT_DIR = /usr/lib/TweakInject
 #define SUBSIDIARY_SAFEMODE_FILE = /var/subsidiary/safemode
@@ -21,14 +21,13 @@ NSString *findBundleID(const char *path) {
  NSRange range = [pathString rangeOfString:@".app/" options:NSBackwardsSearch];
  if (range.length > 0) {
   //process is an app
-  NSString *infoPlistPath = [NSString stringWithFormat:@"%@Info.plist",[bundleID substringToIndex:range.location]] //get the app's infoplist path from file path
+  NSString *infoPlistPath = [NSString stringWithFormat:@"%@Info.plist",[pathString substringToIndex:range.location]]; //get the app's infoplist path from file path
   NSDictionary *mainDictionary = [NSDictionary dictionaryWithContentsOfFile:infoPlistPath];
   if (mainDictionary) {
    return [mainDictionary objectForKey:@"CFBundleIdentifier"];
   }
- } else {
-  return NULL;
  }
+ return NULL;
 }
 
 NSString *findProcessName(const char *path) {
@@ -36,13 +35,13 @@ NSString *findProcessName(const char *path) {
  NSRange range = [pathString rangeOfString:@"/" options:NSBackwardsSearch];
  if (range.length > 0) {
   //process is an app
-  return [bundleID substringFromIndex:range.location];
+  return [pathString substringFromIndex:range.location];
  } else {
-  return path; //sometimes ex with posix_spawnp the file passed in will be the name of the process, so return the input passed
+  return [NSString stringWithUTF8String:path]; //sometimes ex with posix_spawnp the file passed in will be the name of the process, so return the input passed
  }
 }
 
-int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]) {
+int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char *const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
  //compile this dylib and put it in launchd, then CT sign
@@ -97,9 +96,10 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
+ //TODO: this won't work bc I'm returning a const char* [] instead of a char * const[]
  return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
 }
-int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char * const envp[restrict]) {
+int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char * const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
  //This is example code that I think should (theoretically) work?
  //compile this dylib and put it in launchd, then CT sign
@@ -154,6 +154,7 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
+ //TODO: this won't work bc I'm returning a const char* [] instead of a char * const[]
  return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
 }
 
@@ -170,7 +171,7 @@ int main(void) {
     if ([mutableFilter objectForKey:bundleid]) {
      [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:bundleid],[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:bundleid];
     } else {
-     [mutableFilter addObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:bundleid];
+     [mutableFilter setObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:bundleid];
     }
    }
    NSArray *executables = [[[NSDictionary dictionaryWithContentsOfFile:[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Executables"];
@@ -178,7 +179,7 @@ int main(void) {
     if ([mutableFilter objectForKey:executable]) {
      [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:executable],[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:executable];
     } else {
-     [mutableFilter addObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:executable];
+     [mutableFilter setObject:[[@"SUBSIDIARY_TWEAKINJECT_DIR" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:executable];
     }
    }
   }
