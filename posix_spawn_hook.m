@@ -49,12 +49,12 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
  //in real world we shouldn't want to insert this dylib in *everything* and only insert it in stuff it should be inserted in, but once again, only an example
  
  //get bundle id for process and check if its in whitelist
- NSString *bundleID = findBundleID(path);
- if (!bundleID) {
+ NSString *process = findBundleID(path);
+ if (!process) {
   //get the process name if we can't get bundle id
-  findProcessName(path);
+  process = findProcessName(path);
  }
- if (![whitelist containsObject:bundleID]) {
+ if (![whitelist containsObject:process]) {
   //not in whitelist - don't inject dylib, just call posix_spawn as normal
   return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
  }
