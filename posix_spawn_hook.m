@@ -1,5 +1,6 @@
 //Snoolie K / 0xilis, Subsidiary
-//just toying around rn
+//Compile this file (posix_spawn_hook.m) as a dylib and inject into launchd
+//This hooks posix_spawn / posix_spawnp using fishhook
 
 #include <stdio.h>
 #include <string.h>
