@@ -183,7 +183,8 @@ int main(void) {
    }
   }
  }];
- filter = [[NSDictionary alloc] initWithDictionary:mutableFilter]; //dictionary of apps/processes to inject a dylib into (SpringBoard and installd inject /var/subsidiary/TweakDylib.dylib)
+ filter = [[NSDictionary alloc] initWithDictionary:mutableFilter]; //dictionary of apps/processes to inject a dylib into
+ //ex, here is a filter dict that injects /var/subsidiary/TweakDylib.dylib into SpringBoard and installd: filter = [[NSDictionary alloc] initWithObjectsAndKeys:@"com.apple.springboard",@"/var/subsidiary/TweakDylib.dylib",@"installd",@"/var/subsidiary/TweakDylib.dylib",nil];
  uint32_t dyld_image_count = _dyld_image_count();
  //find our image
  for (int i=0; i<dyld_image_count; i++) {
