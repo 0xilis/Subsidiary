@@ -95,8 +95,16 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
- //TODO: this won't work bc I'm returning a const char* [] instead of a char * const[]
- return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
+ //const char *[] to char * const []
+ //I hope to god this shit works
+ char **ugh = malloc(sizeof(char *) * (index + 2));
+ char *const *newNewEnvp = ugh;
+ for (size_t idx = 0; idx < index; idx++) {
+  char *env = (char*)newEnvp[idx];
+  *ugh++ = env;
+ }
+ *ugh++ = NULL;
+ return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newNewEnvp);
 }
 int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char * const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
@@ -152,8 +160,16 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
   newEnvp[dyldLibIndex] = [string UTF8String];
  }
- //TODO: this won't work bc I'm returning a const char* [] instead of a char * const[]
- return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
+ //const char *[] to char * const []
+ //I hope to god this shit works
+ char **ugh = malloc(sizeof(char *) * (index + 2));
+ char *const *newNewEnvp = ugh;
+ for (size_t idx = 0; idx < index; idx++) {
+  char *env = (char*)newEnvp[idx];
+  *ugh++ = env;
+ }
+ *ugh++ = NULL;
+ return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newNewEnvp);
 }
 
 int main(void) {
