@@ -10,8 +10,6 @@
 static int (*orig_posix_spawn)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const argv[restrict], char *const envp[restrict]);
 
-#define SUBSIDIARY_TWEAK_LOAD_PLIST /var/subsidiary/tweaks/subsidiary.plist
-
 NSDictionary* filter;
 
 NSString *findBundleID(const char *path) {
@@ -132,7 +130,32 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
 }
 
 int main(void) {
- filter = [[NSDictionary alloc] initWithObjects:@"com.apple.springboard",@"/var/subsidiary/TweakDylib.dylib",@"installd",@"/var/subsidiary/TweakDylib.dylib",nil]; //dictionary of apps/processes to inject a dylib into (SpringBoard and installd inject /var/subsidiary/TweakDylib.dylib)
+ NSMutableDictionary *mutableFilter = [[NSMutableDictionary alloc]init];
+ NSArray* dirs = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:@"/usr/lib/TweakInject" error:nil];
+ NSMutableArray *plistFiles = [[NSMutableArray alloc] init];
+ [dirs enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+  NSString *filename = (NSString *)obj;
+  NSString *extension = [[filename pathExtension] lowercaseString];
+  if ([extension isEqualToString:@"plist"]) {
+   NSArray *bundleIDs = [[[NSDictionary dictionaryWithContentsOfFile:[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Bundles"];
+   for (id bundleid in bundleIDs) {
+    if ([mutableFilter objectForKey:bundleid]) {
+     [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:bundleid],[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:bundleid];
+    } else {
+     [mutableFilter addObject:[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:bundleid];
+    }
+   }
+   NSArray *executables = [[[NSDictionary dictionaryWithContentsOfFile:[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]]objectForKey:@"Filter"]objectForKey:@"Executables"];
+   for (id executable in executables) {
+    if ([mutableFilter objectForKey:executable]) {
+     [mutableFilter setObject:[NSString stringWithFormat:@"%@:%@",[mutableFilter objectForKey:executable],[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"]] forKey:executable];
+    } else {
+     [mutableFilter addObject:[[@"/usr/lib/TweakInject" stringByAppendingPathComponent:filename]stringByReplacingOccurrencesOfString:@".plist" withString:@".dylib"] forKey:executable];
+    }
+   }
+  }
+ }];
+ filter = [[NSDictionary alloc] initWithDictionary:mutableFilter]; //dictionary of apps/processes to inject a dylib into (SpringBoard and installd inject /var/subsidiary/TweakDylib.dylib)
  uint32_t dyld_image_count = _dyld_image_count();
  //find our image
  for (int i=0; i<dyld_image_count; i++) {
