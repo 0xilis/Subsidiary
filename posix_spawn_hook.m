@@ -74,37 +74,32 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   }
   index++;
  }
+ //I *REALLY* hope this code works
+ char **ugh;
  if (dyldLibIndex == -1) {
-  index++;
+  ugh = malloc(sizeof(char *) * (index + 3)); //if we need to add DYLD_INSERT_LIBRARIES to env instead of modifying existing env, index should be + 1 since we will be adding a env var obv
+ } else {
+  ugh = malloc(sizeof(char *) * (index + 2));
  }
- const char* newEnvp[index];
+ char* const *newEnvp = ugh;
  //add env vars to newEnvp from our current environment vars
  int index2 = 0;
- for (char * const *ptr = envp; *ptr; ptr++) {
-  newEnvp[index2] = *ptr;
+ for (size_t idx = 0; idx < index; idx++) {
+  char *env = envp[idx];
+  if (index2 == dyldLibIndex) {
+   NSString *string = [[NSString alloc]initWithUTF8String:envp[idx]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
+   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
+   env = (char *)[string UTF8String];
+  }
+  *ugh++ = env;
   index2++;
  }
  if (dyldLibIndex == -1) {
-  //add DYLD_INSERT_LIBRARIES env var 
-  //index2 should be equal to dyldLibIndex at this moment
-  newEnvp[index2] = [[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
- } else {
-  //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
-  //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
-  NSString *string = [[NSString alloc]initWithUTF8String:newEnvp[dyldLibIndex]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
-  newEnvp[dyldLibIndex] = [string UTF8String];
- }
- //const char *[] to char * const []
- //I hope to god this shit works
- char **ugh = malloc(sizeof(char *) * (index + 2));
- char *const *newNewEnvp = ugh;
- for (size_t idx = 0; idx < index; idx++) {
-  char *env = (char*)newEnvp[idx];
-  *ugh++ = env;
+  //add DYLD_INSERT_LIBRARIES env var
+  *ugh++ = (char *)[[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
  }
  *ugh++ = NULL;
- return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newNewEnvp);
+ return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, newEnvp);
 }
 int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp, char *const orig_argv[restrict], char * const envp[restrict]) {
  //GUESS: Add DYLD_INSERT_LIBRARIES to envp
@@ -139,37 +134,31 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   }
   index++;
  }
+ char **ugh;
  if (dyldLibIndex == -1) {
-  index++;
+  ugh = malloc(sizeof(char *) * (index + 3)); //if we need to add DYLD_INSERT_LIBRARIES to env instead of modifying existing env, index should be + 1 since we will be adding a env var obv
+ } else {
+  ugh = malloc(sizeof(char *) * (index + 2));
  }
- const char* newEnvp[index];
+ char* const *newEnvp = ugh;
  //add env vars to newEnvp from our current environment vars
  int index2 = 0;
- for (char * const *ptr = envp; *ptr; ptr++) {
-  newEnvp[index2] = *ptr;
+ for (size_t idx = 0; idx < index; idx++) {
+  char *env = envp[idx];
+  if (index2 == dyldLibIndex) {
+   NSString *string = [[NSString alloc]initWithUTF8String:envp[idx]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
+   string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
+   env = (char *)[string UTF8String];
+  }
+  *ugh++ = env;
   index2++;
  }
  if (dyldLibIndex == -1) {
-  //add DYLD_INSERT_LIBRARIES env var 
-  //index2 should be equal to dyldLibIndex at this moment
-  newEnvp[index2] = [[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
- } else {
-  //modify existing DYLD_INSERT_LIBRARIES env var to use /var/subsidiary/TweakDylib.dylib
-  //ex if DYLD_INSERT_LIBRARIES env var is DYLD_INSERT_LIBRARIES=/some/lib.dylib, it should now be DYLD_INSERT_LIBRARIES=/var/subsidiary/TweakDylib.dylib:/some/lib.dylib
-  NSString *string = [[NSString alloc]initWithUTF8String:newEnvp[dyldLibIndex]]; //make the DYLD_INSERT_LIBRARIES env var to objc string
-  string = [NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@:%@",injectionString,[string substringFromIndex:22]];
-  newEnvp[dyldLibIndex] = [string UTF8String];
- }
- //const char *[] to char * const []
- //I hope to god this shit works
- char **ugh = malloc(sizeof(char *) * (index + 2));
- char *const *newNewEnvp = ugh;
- for (size_t idx = 0; idx < index; idx++) {
-  char *env = (char*)newEnvp[idx];
-  *ugh++ = env;
+  //add DYLD_INSERT_LIBRARIES env var
+  *ugh++ = (char *)[[NSString stringWithFormat:@"DYLD_INSERT_LIBRARIES=%@",injectionString]UTF8String];
  }
  *ugh++ = NULL;
- return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newNewEnvp);
+ return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, newEnvp);
 }
 
 int main(void) {
