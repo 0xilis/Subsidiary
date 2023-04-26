@@ -16,7 +16,9 @@ static int (*orig_posix_spawnp)(pid_t *restrict pid, const char *restrict file, 
 
 NSDictionary* filter;
 
-NSString *findBundleID(const char *path) {
+
+NSString *findProcessInject(const char *path) {
+ //get bundle id for process
  NSString *pathString = [NSString stringWithUTF8String:path];
  NSRange range = [pathString rangeOfString:@".app/" options:NSBackwardsSearch];
  if (range.length > 0) {
@@ -24,20 +26,16 @@ NSString *findBundleID(const char *path) {
   NSString *infoPlistPath = [NSString stringWithFormat:@"%@Info.plist",[pathString substringToIndex:range.location]]; //get the app's infoplist path from file path
   NSDictionary *mainDictionary = [NSDictionary dictionaryWithContentsOfFile:infoPlistPath];
   if (mainDictionary) {
-   return [mainDictionary objectForKey:@"CFBundleIdentifier"];
+   return [filter objectForKey:[mainDictionary objectForKey:@"CFBundleIdentifier"]];
   }
  }
- return NULL;
-}
-
-NSString *findProcessName(const char *path) {
- NSString *pathString = [NSString stringWithUTF8String:path];
+ //get the process name if we can't get bundle id
  NSRange range = [pathString rangeOfString:@"/" options:NSBackwardsSearch];
  if (range.length > 0) {
   //process is an app
-  return [pathString substringFromIndex:range.location];
+  return [filter objectForKey:[pathString substringFromIndex:range.location]];
  } else {
-  return [NSString stringWithUTF8String:path]; //sometimes ex with posix_spawnp the file passed in will be the name of the process, so return the input passed
+  return [filter objectForKey:[NSString stringWithUTF8String:path]]; //sometimes ex with posix_spawnp the file passed in will be the name of the process, so return the input passed
  }
 }
 
@@ -55,17 +53,12 @@ int hook_posix_spawn(pid_t *restrict pid, const char *restrict path, const posix
   return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
  }
  
- //get bundle id for process and check if its in whitelist
- NSString *process = findBundleID(path);
- if (!process) {
-  //get the process name if we can't get bundle id
-  process = findProcessName(path);
- }
- if (![[filter allKeys] containsObject:process]) {
+ //get the injection string for process
+ NSString* injectionString = findProcessInject(path);
+ if (!injectionString) {
   //not in whitelist - don't inject dylib, just call posix_spawn as normal
   return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
  }
- NSString* injectionString = [filter objectForKey:process];
  int dyldLibIndex = -1;
  int index = 0;
  for (char * const *ptr = envp; *ptr; ptr++) {
@@ -117,17 +110,12 @@ int hook_posix_spawnp(pid_t *restrict pid, const char *restrict file, const posi
   return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, envp);
  }
  
- //get bundle id for process and check if its in whitelist
- NSString *process = findBundleID(file);
- if (!process) {
-  //get the process name if we can't get bundle id
-  process = findProcessName(file);
- }
- if (![[filter allKeys] containsObject:process]) {
+ //get the injection string for process
+ NSString* injectionString = findProcessInject(path);
+ if (!injectionString) {
   //not in whitelist - don't inject dylib, just call posix_spawn as normal
-  return orig_posix_spawnp(pid, file, file_actions, attrp, orig_argv, envp);
+  return orig_posix_spawn(pid, path, file_actions, attrp, orig_argv, envp);
  }
- NSString* injectionString = [filter objectForKey:process];
  int dyldLibIndex = -1;
  int index = 0;
  for (char * const *ptr = envp; *ptr; ptr++) {
